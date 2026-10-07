@@ -24,7 +24,14 @@ export default withMermaid(
     // 若你的仓库名不是 ckj_blog，请同步修改 .github/workflows/deploy.yml 中的 VITEPRESS_BASE。
     base: process.env.VITEPRESS_BASE || '/',
 
-    head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]],
+    // favicon 通过 transformHead 注入 <head>。
+    // 为什么不在 head 选项里直接写 '/favicon.svg'：VitePress 不会为 head 中手写的
+    // 绝对路径自动补 base 前缀，部署到子路径（GitHub Pages 项目页 /personalblog/）
+    // 后会请求站点根下的 /favicon.svg 而 404。这里用 base 动态拼接，两种部署都正确。
+    // 注意：base 位于 ctx.siteData.base，ctx.siteConfig 中没有该字段（实测确认）。
+    transformHead: ({ siteData }) => [
+      ['link', { rel: 'icon', type: 'image/svg+xml', href: `${siteData.base}favicon.svg` }]
+    ],
 
     // ------------------------------------------------------------------
     // T3.3 亮色 / 暗色模式

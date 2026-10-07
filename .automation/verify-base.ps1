@@ -71,8 +71,24 @@ function Invoke-BuildCheck {
   return $pass
 }
 
+# Derive the project-page base from the git remote instead of hardcoding it,
+# so this script stays correct if the repository is renamed or moved.
+$remoteUrl = (git config --get remote.origin.url)
+$repoName = ''
+if ($remoteUrl) {
+  $repoName = ($remoteUrl -replace '\.git$', '') -replace '.*/', ''
+}
+
 $r1 = Invoke-BuildCheck -Label 'local / user page / custom domain (base = /)' -Prefix '/'
-$r2 = Invoke-BuildCheck -Label 'GitHub project page (base = /ckj_blog/ as injected by workflow)' -Prefix '/ckj_blog/'
+
+if ($repoName -and $repoName -notlike '*.github.io') {
+  $projectBase = "/$repoName/"
+  Write-Host "Detected repository name from git remote: $repoName"
+  $r2 = Invoke-BuildCheck -Label "GitHub project page (base = $projectBase)" -Prefix $projectBase
+} else {
+  Write-Host "No usable git remote (or it is a user page); skipping the project-page scenario."
+  $r2 = $true
+}
 
 # restore local default
 $env:VITEPRESS_BASE = $null

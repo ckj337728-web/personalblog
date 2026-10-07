@@ -19,8 +19,7 @@
 | 阶段五 示例文章（T5.1–T5.6） | ✅ 已完成 | 3 篇文章规范巡检 3/3 PASS |
 | 阶段六 UI 与交互（T6.1–T6.5） | ✅ 已完成 | 真实浏览器验证 23/23 PASS；修复窄屏溢出 |
 | 阶段七 CI/CD 与部署（T7.1–T7.6） | ✅ 已完成 | 工作流结构校验通过；双 base 场景各 1108 项资源引用校验通过 |
-| 阶段八 测试验收（T8.1–T8.7） | ✅ 已完成 | dev 22/22 + preview 22/22 + 终检 10/10 全部通过 |
-| 阶段八 T8.8 收尾提交 | ⚠️ 受阻 | 本地提交完成；**推送远端待用户提供仓库地址** |
+| 阶段八 测试验收（T8.1–T8.8） | ✅ 全部完成 | dev 22/22 + preview 22/22 + 终检 10/10；线上 22/22，Actions 运行成功 |
 
 ### 0.1 初始基线（搭建前）
 
@@ -220,6 +219,29 @@
 3. **链接检查未做 URL 解码**：href 是百分号编码（如 `%E8%AE%A1`），直接拼文件路径必然找不到，误报 2 个"缺失链接"；而同一批链接的 HTTP 层检查全部 200，暴露出是检查器的问题。修正为先 `decodeURIComponent` 再比对。
 
 **结论：三次失败中没有一次是站点缺陷，全部是断言写错。** 若不做交叉验证（HTTP 层 vs 文件系统、DOM 节点 vs 可见高度），会得出"侧边栏不能折叠、站内有死链"的错误结论。
+
+---
+
+### 0.10 最终交付状态
+
+| 项 | 结果 |
+| --- | --- |
+| 线上站点 | https://ckj337728-web.github.io/personalblog/ |
+| 仓库 | https://github.com/ckj337728-web/personalblog |
+| CI 运行 | id `37643406741`，`conclusion=success`（build + deploy 全部步骤成功） |
+| 线上功能验收 | 22/22 通过（与本地 dev / preview 结果一致） |
+| 任务完成度 | **55 / 55** |
+
+**T8.8 推送阶段发现的两个问题**
+
+1. **首次推送不触发 workflow**：原因是 Pages 未启用（`has_pages: false`）。启用 Pages 后用 `workflow_dispatch` 正常触发。README 中已写明需先将 Pages 的 Source 设为 GitHub Actions。
+2. **favicon 在子路径部署下 404**：见 T8.8 执行记录。这是**只有真正部署到子路径才会暴露**的问题 —— 本地 `/` 与产物检查都发现不了，必须靠线上浏览器请求才看得到。已在 `transformHead` 中按 base 动态拼接修复。
+
+**关于本地开发与部署的 base 差异（最终机制）**
+
+- 本地 `docs:dev` / `docs:build`：不带 `VITEPRESS_BASE`，`base` 为 `/`，直接访问 `http://localhost:5173/`。
+- CI：工作流按 `github.event.repository.name`（`personalblog`）注入 `VITEPRESS_BASE=/personalblog/`，与 Pages 项目页路径一致；仓库名形如 `<user>.github.io` 时自动取 `/`。
+- 因此**本地与线上均无需改代码**，仓库改名后也自动适配。
 
 ---
 
@@ -569,11 +591,19 @@
   - 完成标准：`package.json` 依赖与主题文件逐条对照通过。
   - 执行记录：直接依赖 5 个（`vitepress`、`vitepress-plugin-mermaid`、`mermaid`、`@mdit/plugin-katex`、`katex`），正则排查 hexo/hugo/vuepress/gatsby/next/nuxt/animate/swiper/particles **全部无命中**；扫描全部 24 个页面产物，广告、真实弹窗（`role="dialog"`/`<dialog>`）、推荐位、轮播/粒子/动画库、统计脚本、外部 CDN 与外部字体**全部无命中**。
 
-- [ ] **T8.8 收尾提交**
+- [×] **T8.8 收尾提交**
   - 提交全部成果并推送到远端，确认 Actions 运行成功、Pages 可访问。
   - 完成标准：Actions 最近一次运行状态为成功；线上首页与一篇示例文章可正常打开。
-  - **状态：受阻，未完成。** 仓库当前**未配置任何 git remote**，且本环境无 GitHub 凭据，无法推送。按"不伪造验证结果"的原则，**不会把"Actions 运行成功、Pages 可访问"标记为已完成** —— 这两项只能在推送后由真实 CI 运行产生。
-  - 待用户提供仓库地址后执行：`git remote add origin <仓库地址>` → `git push -u origin main` → 在仓库 `Settings → Pages` 将 Source 设为 **GitHub Actions** → 观察首次 workflow 运行结果。
+  - 远端仓库：`https://github.com/ckj337728-web/personalblog.git`（由用户提供）
+  - 执行记录：
+    1. `git remote add origin` + `git push -u origin main` 成功，远端 `main` 与本地 HEAD 一致（`88a17a3`）。
+    2. 首次推送**未触发工作流**（`total_count: 0`），根因是 Pages 尚未启用（`has_pages: false`）。
+    3. 通过 GitHub API 启用 Pages（`build_type: workflow`），站点地址 `https://ckj337728-web.github.io/personalblog/`。
+    4. 用 `workflow_dispatch` 触发运行（id `37643406741`），最终 `status=completed / conclusion=success`，`build` 与 `deploy` 两个 job 全部步骤成功。
+    5. **线上实测**：8 个 URL 全部 HTTP 200（含中文路径文章、图片、favicon）；**22 项浏览器功能断言在线上重跑，22/22 通过**（导航、侧边栏折叠、大纲、代码高亮/行号/复制、Mermaid、LaTeX、页脚三项、暗色切换、中文搜索命中 10 条、窄屏无溢出）。
+    6. `base` 自动推导验证：仓库名为 `personalblog`（非目录名 `ckj_blog`），工作流按仓库名推导出 `/personalblog/`，线上 48 个资源引用全部 200，且无裸 `/assets/` 引用。
+  - **过程中发现并修复的真实缺陷（favicon 子路径 404）**：线上浏览器请求 `https://ckj337728-web.github.io/favicon.svg` 返回 404。根因是 `config.ts` 的 `head` 中手写绝对路径 `/favicon.svg`，而 **VitePress 不会为 head 里手写的绝对路径补 base 前缀**（官方文档中"base 会自动加到以 / 开头的 URL"的描述仅适用于 `base: './'` 的可搬迁构建）。修复为 `transformHead` 中按 base 动态拼接；定位过程中还确认了正确的上下文字段是 `ctx.siteData.base`，`ctx.siteConfig` 中并无 `base`（曾因此产出 `undefinedfavicon.svg`）。修复后两种 base 场景均正确且标签位于 `<head>` 内。
+  - 同步修正：`.automation/verify-base.ps1` 原先硬编码 `/ckj_blog/`，已改为从 `git remote` 自动推导仓库名，避免仓库改名后脚本失效。
 
 ---
 
