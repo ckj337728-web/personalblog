@@ -198,6 +198,7 @@ export default withMermaid(
                 collapsed: false,
                 items: [
                   { text: '大模型基础', link: '/knowledge/05-AI与LLM学习/大模型基础/' },
+                  { text: '自注意力到 Transformer', link: '/knowledge/05-AI与LLM学习/大模型基础/attention-mechanism' },
                   { text: 'Agent智能体', link: '/knowledge/05-AI与LLM学习/Agent智能体/' },
                   { text: 'Harness与沙箱与评测体系', link: '/knowledge/05-AI与LLM学习/Harness与沙箱与评测体系/' },
                   { text: 'Prompt工程', link: '/knowledge/05-AI与LLM学习/Prompt工程/' }
@@ -216,7 +217,8 @@ export default withMermaid(
           {
             text: '技术博客',
             items: [
-              { text: '文章列表', link: '/blog/' }
+              { text: '文章列表', link: '/blog/' },
+              { text: 'LaTeX 公式被静默丢弃', link: '/blog/vitepress-math-silent-failure' }
               // 后续新增文章在此登记（按日期倒序）。
             ]
           }
