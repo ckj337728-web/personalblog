@@ -1,0 +1,18 @@
+{
+  "name": "ckj-blog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "个人技术博客 & 永久知识库二合一静态站点（VitePress）",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "markdown-it-mathjax3": "^4.3.2",
+    "mermaid": "^11.17.2",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
