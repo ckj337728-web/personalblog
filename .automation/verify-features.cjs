@@ -71,6 +71,10 @@ function check(name, pass, detail = '') {
 
   // ---------- article ----------
   await page.goto(join(ARTICLE), { waitUntil: 'networkidle' })
+  // The sidebar is rendered by the client after hydration. `networkidle` can resolve
+  // before hydration finishes, especially against a remote host, so wait explicitly
+  // for the sidebar instead of assuming it is present. (This made the check flaky.)
+  await page.waitForSelector('.VPSidebarItem.level-1.collapsible > .item > .caret', { timeout: 30000 })
 
   // sidebar: 7 categories in order
   const sidebar = await page.$$eval('.VPSidebarItem .text', (els) => els.map((e) => e.textContent.trim()))
