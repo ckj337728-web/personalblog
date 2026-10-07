@@ -66,6 +66,29 @@ export default withMermaid(
     },
 
     // ------------------------------------------------------------------
+    // 开发模式依赖互操作（修复 dev 下应用无法挂载的问题）
+    // ------------------------------------------------------------------
+    // 现象：npm run docs:dev 打开页面全站空白，#app 无任何子节点。
+    // 根因：mermaid 用到的 fastdom@1.x 是纯 CommonJS 包（package.json 无 module
+    //   字段、无 exports 映射），且其扩展文件 fastdom/extensions/fastdom-promised.js
+    //   也是 CJS。Vite 开发服务器把它们当 ESM 原样返回，浏览器报
+    //   "does not provide an export named 'default'"，模块加载失败导致应用不挂载。
+    //   生产构建走 Rollup + commonjs 插件，因此 docs:build 正常 —— 属 dev 与 build 差异。
+    // 修复：用别名把这两个模块指向具体文件，并加入预打包列表，由 Vite 做 CJS→ESM 互操作。
+    //   别名必须指向文件，指向目录无法解析（该包没有 exports 映射）。
+    resolve: {
+      alias: [
+        { find: /^fastdom$/, replacement: 'fastdom/fastdom.js' },
+        { find: /^fastdom\/extensions\/fastdom-promised$/, replacement: 'fastdom/extensions/fastdom-promised.js' }
+      ]
+    },
+    vite: {
+      optimizeDeps: {
+        include: ['fastdom', 'fastdom/extensions/fastdom-promised.js']
+      }
+    },
+
+    // ------------------------------------------------------------------
     // Mermaid 配置（spec 2 要求支持 Mermaid 流程图）
     // ------------------------------------------------------------------
     mermaid: {
