@@ -13,8 +13,8 @@
 | 阶段 | 状态 | 完成时间 |
 | --- | --- | --- |
 | 阶段一 基础准备（T1.1–T1.7） | ✅ 已完成 | 提交 `d192e04` |
-| 阶段二 目录骨架（T2.1–T2.8） | ✅ 已完成 | 16 个内容目录 + 19 个页面全部可访问 |
-| 阶段三 核心配置（T3.1–T3.8） | ⬜ 未开始 | — |
+| 阶段二 目录骨架（T2.1–T2.8） | ✅ 已完成 | 提交 `fe5a3a9` |
+| 阶段三 核心配置（T3.1–T3.8） | ✅ 已完成 | 提交 `6720c01`；搜索/Mermaid/公式均实测通过 |
 | 阶段四 导航/侧边栏/首页（T4.1–T4.7） | ⬜ 未开始 | — |
 | 阶段五 示例文章（T5.1–T5.6） | ⬜ 未开始 | — |
 | 阶段六 UI 与交互（T6.1–T6.5） | ⬜ 未开始 | — |
@@ -64,6 +64,29 @@
 | 验证结果 | `docs:build` 退出码 0、无 dead link；14 个关键页面产出；`docs:preview` 下 19 个 URL 全部 HTTP 200 且含 `<h1>` |
 | 目录命名 | 全部无空格、无 `&`、无 `/`；7 个一级分类均带 `01-`～`07-` 数字前缀 |
 | 命名与 spec 差异 | 仅 2 处规范化：`02-Linux 运维 & 底层` → `02-Linux运维与底层`、`03-C/C++ 编程笔记` → `03-C与C++编程笔记`（去空格与路径分隔符，保留原语义，URL 编码已实测安全） |
+
+---
+
+### 0.4 阶段三完成后的实际状态
+
+| 项 | 结果 |
+| --- | --- |
+| 配置文件 | `docs/.vitepress/config.ts`（站点元信息 + 搜索 + 亮暗模式 + Markdown 能力 + Mermaid + lastUpdated） |
+| 主题入口 | `docs/.vitepress/theme/index.ts`：`extends: DefaultTheme` + `withMermaid` + `katex.min.css` |
+| 依赖 | 5 个直接依赖：`vitepress`、`vitepress-plugin-mermaid`、`mermaid`、`@mdit/plugin-katex`、`katex` |
+| 构建耗时 | 约 22–33s（接入 Mermaid 后由 2.75s 上升，属预期） |
+| 验证结果 | 构建退出码 0；行号/高亮/复制/容器中文标签/KaTeX 公式/Mermaid 图/lastUpdated 全部实测通过 |
+
+**阶段三发现并修复的两个隐性故障（构建均报成功，不看产物无法发现）**
+
+1. **LaTeX 公式被静默丢弃**：原方案用 `markdown-it-mathjax3@4`（异步插件），而 `vitepress@1.6.4` 不依赖 `markdown-it-async`，渲染链是同步的，异步插件的 Promise 不会被 await —— 公式**连纯文本回退都没有**，直接从产物消失，但构建退出码仍为 0。
+   - 定位方式：隔离实验证明 mathjax3 单独用 `md.render()` 能正常渲染（9260 字符含 `mjx-container`），集成后为 0，据此断定是异步链路问题。
+   - 修复：改用同步插件 `@mdit/plugin-katex`（peer 为 `markdown-it ^14`，与 1.6.4 一致），并在主题中引入 `katex.min.css`（本地依赖，不走 CDN）。
+
+2. **中文全文搜索失效**：`minisearch` 默认按空白/标点切词，中文无空格 → 「三次握手」被当成单个 token，导致查询「握手」**命中 0 条**（实测确认）。在纯中文站点上等于 spec 4.2「全文搜索（核心必备）」未达标。
+   - 修复：在 `themeConfig.search.options.miniSearch` 中为 CJK 增加字符级切分（`tokenize`），并把多词匹配语义改为 `combineWith: 'AND'`。
+   - 为何必须加 AND：字符级切分后中文查询会拆成多个单字，沿用默认 OR 时只要任一字出现即命中，产生大量噪音（实测「量子计算机」返回 12 条无关结果）。加 AND 后召回不降、噪音清零、结果数更精确。
+   - 实测（8 个应命中 + 3 个应无结果）：全部通过；`握手`→8 条首条为「为什么需要三次握手」，`TIME_WAIT`→2 条，`量子计算机`→0 条。
 
 ---
 
@@ -164,39 +187,53 @@
 
 ## 阶段三：VitePress 核心配置（spec 2 / 4 / 6）
 
-- [ ] **T3.1 站点基础元信息**
+- [×] **T3.1 站点基础元信息**
   - `lang: 'zh-CN'`、`title`、`description`、`base`（默认 `'/'`，若部署到 `用户名.github.io/仓库名/` 则改为 `'/仓库名/'`）、`head` 中 favicon。
-  - 完成标准：`docs/.vitepress/config.mts` 含上述字段且构建无警告。
+  - 完成标准：`docs/.vitepress/config.ts` 含上述字段且构建无警告。
+  - 执行记录：配置文件名后缀为 `.ts`（非 `.mts`，VitePress 1.6.4 两者均支持，`.ts` 与项目 `type: module` 一致）；favicon 用 `docs/public/favicon.svg`（自建极简 SVG，无外部依赖），产物 `<link rel="icon" href="/favicon.svg">` 与 dist 中的文件均已确认；`lang="zh-CN"` 已确认写入 HTML。
 
-- [ ] **T3.2 开启全文搜索（spec 4.2 核心必备）**
+- [×] **T3.2 开启全文搜索（spec 4.2 核心必备）**
   - `themeConfig.search = { provider: 'local', options: { locales: { root: { translations: {...中文文案...} } } } }`。
   - 完成标准：构建后页面顶部出现搜索框；输入任一示例文章关键词能命中结果。
+  - 执行记录：本地索引 `@localSearchIndexroot.*.js` 已生成，含 27 个文档条目与文章正文；中文界面文案生效（实测 `aria-label="搜索"`）。
+  - **修订（重要）**：仅配 `provider: 'local'` 时中文检索**不可用** —— minisearch 默认按空白/标点切词，中文无空格使「三次握手」成为单 token，查询「握手」命中 0 条。已增加 CJK 字符级 `tokenize` 与 `combineWith: 'AND'`，实测 8 个应命中查询全部通过、3 个无关查询（含「量子计算机」）全部 0 条。
 
-- [ ] **T3.3 开启亮色/暗色模式（spec 4.1）**
+- [×] **T3.3 开启亮色/暗色模式（spec 4.1）**
   - `appearance: true`（默认即开启，显式声明以便后续维护）。
   - 完成标准：页面右上角出现主题切换按钮，切换后 `<html>` 上的 `dark` class 随之变化。
+  - 执行记录：产物中 `VPSwitchAppearance` 组件与 appearance 初始化脚本（`vitepress-theme-appearance`，防闪烁）均存在；`appearance: true` 显式声明。
 
-- [ ] **T3.4 配置 Markdown 能力（spec 2）**
+- [×] **T3.4 配置 Markdown 能力（spec 2）**
   - `markdown.lineNumbers: true`（代码行号）。
-  - `markdown.config` 注入 `markdown-it-mathjax3`（LaTeX 公式）。
+  - `markdown.config` 注入数学渲染插件（LaTeX 公式）。
   - `markdown.container` 中文标签（tip/warning/danger/info/details）。
   - 完成标准：示例文章中公式渲染为数学排版、代码块左侧出现行号。
+  - **修订（重要）**：`markdown-it-mathjax3@4` 是**异步**插件，vitepress 1.6.4 渲染链为同步（不依赖 `markdown-it-async`），公式会被静默丢弃且构建仍报成功。已改用同步插件 `@mdit/plugin-katex`，并在主题中引入 `katex.min.css`。
+  - 执行记录：产物中确认 `line-numbers-wrapper` 与 `class="line-numbers"`；KaTeX 渲染命中 `class="katex"`；容器默认中文标签命中「信息」，自定义标题容器正常；代码高亮与复制按钮均在。
 
-- [ ] **T3.5 接入 Mermaid（spec 2）**
+- [×] **T3.5 接入 Mermaid（spec 2）**
   - 建 `docs/.vitepress/theme/index.ts`，`extends: DefaultTheme` 并使用 `withMermaid()` 包装。
   - 完成标准：示例文章中的 ` ```mermaid ` 代码块渲染为流程图而非纯文本。
+  - 执行记录：`docs/.vitepress/theme/index.ts` 已建；产物中 `language-mermaid` 代码块已全部转换为 mermaid 容器。
+  - 修订：`vitepress@1.6.4` **未导出** `defineTheme`（该 API 属 2.x），主题直接导出普通对象即可；初版误用 `defineConfig`/`defineTheme` 均已修正。
+  - 副作用记录：接入 Mermaid 后构建耗时由约 2.75s 升至 22–33s（Mermaid 需打包进客户端 bundle），属预期代价。
 
-- [ ] **T3.6 开启 Git 最后更新时间（spec 4.2）**
+- [×] **T3.6 开启 Git 最后更新时间（spec 4.2）**
   - 站点级 `lastUpdated: true`，并在页脚/页面呈现。
   - 完成标准：文章页出现"最后更新于 …"时间，且时间随该文件最新提交变化。
+  - 执行记录：站点级 `lastUpdated: true`；文案经 `themeConfig.lastUpdated.text` 覆盖为中文「最后更新于」（默认英文为 "Last updated:"）。实测已提交文件显示 `最后更新于: 2026-10-07T04:05:21Z`；未提交的新文件取不到时间（属 Git 机制预期，故本阶段将其纳入提交）。
+  - 待办联动：CI 中 `actions/checkout` 必须 `fetch-depth: 0`，否则全站时间会相同（见 T7.2）。
 
-- [ ] **T3.7 明确"无重依赖/无特效"约束（spec 4.3）**
+- [×] **T3.7 明确"无重依赖/无特效"约束（spec 4.3）**
   - 自查配置与主题中不存在动画库、轮播、弹窗、推荐位、统计脚本（除 favicon/字体等必要 head 项）。
-  - 完成标准：`package.json` dependencies 仅含上述 4 个包；`docs/.vitepress/theme/` 无额外第三方组件引入。
+  - 完成标准：依赖清单仅含 spec 所需项；`docs/.vitepress/theme/` 无额外第三方组件引入。
+  - 执行记录：直接依赖共 5 个 —— `vitepress`、`vitepress-plugin-mermaid`、`mermaid`、`@mdit/plugin-katex`、`katex`；`dependencies` 为空，`devDependencies` 5 项。相比原计划的 4 项，多出的是 LaTeX 渲染的同步实现（`@mdit/plugin-katex` + `katex`），属 spec 2 明确要求的能力，非冗余。
+  - 说明：Mermaid 主题采用 `neutral`（低饱和），并非纯灰度；Mermaid 无法做到完全无彩色，已在配置注释中如实标注。
 
-- [ ] **T3.8 配置说明落档**
-  - 在 `docs/.vitepress/config.mts` 关键段落写简短中文注释（如为何 `layout-bottom`、为何锁 mermaid 11）。
+- [×] **T3.8 配置说明落档**
+  - 在 `docs/.vitepress/config.ts` 关键段落写简短中文注释（如为何 `layout-bottom`、为何不自配 footer、为何锁 mermaid 11）。
   - 完成标准：注释存在且解释与实现一致。
+  - 执行记录：`config.ts` 共 137 行，其中 35 行为注释，逐节标注对应任务号；覆盖 `base` 部署路径差异、`layout-bottom` 页脚决策、CJK 分词与 `combineWith` 原因、异步插件陷阱、`fetch-depth` 要求等关键决策，并逐条核对与实现一致。
 
 ---
 
