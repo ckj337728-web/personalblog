@@ -1,0 +1,72 @@
+# GitHub Pages 自动部署（spec 6.2：Push 代码自动打包、自动部署；每次更新自动生成更新时间）
+#
+# 部署前置条件（只需在 GitHub 上设置一次）：
+#   Settings → Pages → Build and deployment → Source 选择 "GitHub Actions"
+#
+# 关于 base 路径：站点 config.ts 的 base 由 VITEPRESS_BASE 环境变量驱动，本工作流按仓库名
+# 自动推导，因此无需修改代码即可在「项目页」与「用户页」两种场景下正确部署：
+#   - 项目页  https://<user>.github.io/<repo>/  → base = /<repo>/
+#   - 用户页  https://<user>.github.io/        → base = /（仓库名形如 <user>.github.io）
+# 若使用自定义域名，请在下方 VITEPRESS_BASE 中改为 '/'。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 允许在 Actions 页面手动触发
+  workflow_dispatch:
+
+# 授予 GITHUB_TOKEN 部署 Pages 所需权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只保留一个部署；排队中的运行不取消，避免丢失已推送的提交
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # lastUpdated 依赖每个文件的 Git 提交时间；浅克隆会让全站时间退化为同一个值
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Build site
+        # 仓库名等于 <user>.github.io 时是用户页（部署在根路径），否则是项目页（部署在 /<repo>/）
+        env:
+          VITEPRESS_BASE: ${{ !endsWith(github.repository, '.github.io') && format('/{0}/', github.event.repository.name) || '/' }}
+        run: npm run docs:build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -15,11 +15,14 @@ export default withMermaid(
     title: '个人技术博客 & 知识库',
     description: '工程师个人技术博客与永久知识库：学习存档、求职展示、公开查阅。',
 
-    // 部署路径说明：base 必须与部署位置一致，否则静态资源与搜索索引会 404。
-    //   GitHub 项目页 https://<user>.github.io/<repo>/  → base: '/<repo>/'
-    //   GitHub 用户页 / 自定义域名 / Vercel           → base: '/'
-    // 当前按根路径部署；阶段七（T7.3）接入 GitHub Pages 时按实际仓库名调整。
-    base: '/',
+    // 部署路径说明（重要）：base 必须与部署位置严格一致，否则 CSS/JS/搜索索引会 404。
+    //   GitHub 项目页 https://<user>.github.io/ckj_blog/  → base: '/ckj_blog/'
+    //   GitHub 用户页 / 自定义域名 / Vercel            → base: '/'
+    // 这里用环境变量驱动，使两种场景都不需要改代码：
+    //   - 本地 npm run docs:dev / docs:build：不带变量 → base '/'
+    //   - GitHub Actions 工作流：注入 VITEPRESS_BASE=/<仓库名>/ → 自动匹配项目页
+    // 若你的仓库名不是 ckj_blog，请同步修改 .github/workflows/deploy.yml 中的 VITEPRESS_BASE。
+    base: process.env.VITEPRESS_BASE || '/',
 
     head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]],
 

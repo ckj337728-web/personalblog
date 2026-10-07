@@ -18,7 +18,7 @@
 | 阶段四 导航/侧边栏/首页（T4.1–T4.7） | ✅ 已完成 | 导航 5 项、侧边栏 29 条目、19 个页面 200 |
 | 阶段五 示例文章（T5.1–T5.6） | ✅ 已完成 | 3 篇文章规范巡检 3/3 PASS |
 | 阶段六 UI 与交互（T6.1–T6.5） | ✅ 已完成 | 真实浏览器验证 23/23 PASS；修复窄屏溢出 |
-| 阶段七 CI/CD 与部署（T7.1–T7.6） | ⬜ 未开始 | — |
+| 阶段七 CI/CD 与部署（T7.1–T7.6） | ✅ 已完成 | 工作流结构校验通过；双 base 场景各 1108 项资源引用校验通过 |
 | 阶段八 测试验收（T8.1–T8.8） | ⬜ 未开始 | — |
 
 ### 0.1 初始基线（搭建前）
@@ -162,6 +162,30 @@
 
 - 公式与代码块在窄屏采用**块内横向滚动**（`overflow-x: auto`），而非换行或缩小字号。这是技术文档的标准做法：代码与公式换行会破坏语义，整页横向滚动才是必须消除的缺陷。
 - 页脚时间采用 **UTC 日期格式**（`2026-10-07 04:05 UTC`）而非本地化格式。原因：服务端与客户端时区可能不同，`Intl` 本地化格式会导致 hydration 不一致（默认主题的 `onMounted` 延迟渲染即为此原因）；UTC 对两侧都是同一确定值。
+
+---
+
+### 0.8 阶段七完成后的实际状态
+
+| 项 | 结果 |
+| --- | --- |
+| 部署工作流 | `.github/workflows/deploy.yml`：push(main) + 手动触发 → build job → deploy job |
+| base 策略 | 环境变量驱动 `VITEPRESS_BASE`，工作流按仓库名自动推导，本地与部署均无需改代码 |
+| README | 技术栈、目录树、启动四步、部署步骤、base 对照表、写文章要点、6 条踩坑注意事项 |
+| 验证工具 | `.automation/verify-base.ps1`（双 base 场景资源可达性校验，可重复执行） |
+| 验证结果 | 工作流 23 项字段结构校验通过；双 base 场景各 1108 项资源引用校验通过；`npm ci` 可复现 |
+
+**阶段七的关键决策与实测**
+
+1. **`base` 不写死，改为环境变量驱动**：本仓库是项目页（`/ckj_blog/`），若把 `base` 写成 `'/'`，部署后 CSS/JS/搜索索引全部 404；若写死 `/ckj_blog/`，本地 `docs:dev` 又要多输一层路径。改为 `process.env.VITEPRESS_BASE || '/'` 后，两种场景都不需要改代码，且工作流按仓库名自动推导并处理 `<user>.github.io` 用户页特例。
+2. **未安装 YAML 校验工具**：项目内无任何 YAML 解析器。为不放宽"无冗余依赖"的约束，改为自写结构化校验脚本（Tab/缩进/字段/顺序/表达式），用后即删。
+3. **Action 版本靠 API 核实而非记忆**：通过 GitHub API 查询 latest release，确认使用 `checkout@v7`、`setup-node@v7`、`configure-pages@v6`、`upload-pages-artifact@v5`、`deploy-pages@v5`。
+
+**阶段七验证过程中的三次自身失误（均已纠正，记录备查）**
+
+1. **校验脚本正则要求了不必要的目录层级**：初版正则写成 `/[^"]*?/(?:assets|images)/`，强制 `^/` 后必须有一段目录，导致 `base: '/'` 下 `/assets/...` 匹配不到，出现「checked: 0 → FAIL」的假失败。改为中间段可选后，两场景各匹配到 1108 个引用。
+2. **函数返回值被输出污染**：PowerShell 函数内 `Write-Output` 会进入返回管道，使 `$r1`/`$r2` 变成数组而非布尔值，出现「单项 FAIL 但 OVERALL PASS」的自相矛盾。改用 `Write-Host` 输出进度、函数只返回布尔值后修正。
+3. **`.ps1` 无 BOM 导致中文注释被 PowerShell 5.1 按 ANSI 解码**，解析报错并最终留下语法错误。该脚本已改为**纯 ASCII 注释**，从根上规避编码依赖。
 
 ---
 
@@ -435,29 +459,40 @@
 
 ## 阶段七：CI/CD 与部署（spec 6.2 / 9）
 
-- [ ] **T7.1 编写 GitHub Actions 部署工作流（spec 6.2）**
+- [×] **T7.1 编写 GitHub Actions 部署工作流（spec 6.2）**
   - 新建 `.github/workflows/deploy.yml`：`on: push`（`main` 分支）+ `workflow_dispatch`；Node 24；`npm ci` → `npm run docs:build` → 上传 `docs/.vitepress/dist` 产物 → 部署到 GitHub Pages（`actions/deploy-pages`，需 `pages: write`、`id-token: write`）。
   - 完成标准：YAML 语法有效（`npx --yes yaml-lint` 或 `actionlint` 任一校验通过），步骤顺序完整。
+  - 执行记录：`.github/workflows/deploy.yml` 已建（72 行）。项目内无 YAML 解析器（PyYAML、js-yaml、yaml 均不存在），为**不污染依赖树**未安装新包，改为编写结构化校验脚本：检查 Tab 字符、缩进是否为 2 的倍数、空列表项、23 个关键字段、步骤顺序、`${{ }}` 配对 —— **全部通过**。脚本用后即删。
+  - 版本核对：通过 GitHub API 查询各 Action 的 latest release 确定真实版本号（避免凭记忆写错）：`actions/checkout@v7`、`actions/setup-node@v7`、`actions/configure-pages@v6`、`actions/upload-pages-artifact@v5`、`actions/deploy-pages@v5`。
+  - 说明：`configure-pages` 步骤用于初始化 Pages 配置；`concurrency` 设为 `cancel-in-progress: false`，避免排队中的部署被取消而丢失已推送的提交。
 
-- [ ] **T7.2 保证 Git 历史完整（lastUpdated 前提）**
+- [×] **T7.2 保证 Git 历史完整（lastUpdated 前提）**
   - `actions/checkout` 必须设置 `fetch-depth: 0`。
   - 完成标准：工作流文件中 `fetch-depth: 0` 存在。
+  - 执行记录：已设置，并附注释说明原因（浅克隆会让全站最后更新时间退化为同一个值）。
 
-- [ ] **T7.3 保证 `base` 与部署路径一致**
-  - 若部署到项目页（`https://<user>.github.io/<repo>/`），`config.mts` 的 `base` 必须为 `'/<repo>/'`；若为用户页或 Vercel 自定义域，则为 `'/'`。
+- [×] **T7.3 保证 `base` 与部署路径一致**
+  - 若部署到项目页（`https://<user>.github.io/<repo>/`），`config.ts` 的 `base` 必须为 `'/<repo>/'`；若为用户页或 Vercel 自定义域，则为 `'/'`。
   - 完成标准：部署后首页静态资源（CSS/JS/图片/搜索索引）全部 200，无 404。
+  - 执行记录（方案修订）：本仓库名为 `ckj_blog`，GitHub Pages 上属**项目页**（`https://<user>.github.io/ckj_blog/`），`base` 必须为 `/ckj_blog/`。为同时满足「本地开箱可用」与「部署开箱可用」，改为**环境变量驱动**：`base: process.env.VITEPRESS_BASE || '/'`，工作流按仓库名自动推导（仓库名形如 `<user>.github.io` 判为用户页取 `/`，否则取 `/<repo>/`），并用 `endsWith` 三元表达式处理用户页特例。
+  - 验证方式：新增 `.automation/verify-base.ps1`，对两种 base 场景各清空产物重新构建，逐页提取资源引用并校验「前缀正确」+「磁盘存在」：两场景各 **1108 个引用，前缀错误 0、缺失 0，全部 PASS**；另实测 `docs:preview` 在 `/ckj_blog/` 下各页面与 CSS 均返回 200。
 
-- [ ] **T7.4 更新时间自动化核对（spec 6.2）**
+- [×] **T7.4 更新时间自动化核对（spec 6.2）**
   - 确认"每次更新自动生成更新时间"由 push 触发的构建 + `lastUpdated` 实现，无需额外脚本。
   - 完成标准：一次新提交推送后，Pages 产物中该文章的最后更新时间发生更新。
+  - 执行记录：逐文件比对 `git log -1 --pretty=%ai` 与产物 `<time datetime>`，确认时间戳**一一对应**（`docs/index.md` 12:19:06+0800 → `04:19:06Z`；`blog/index.md` 12:43:15+0800 → `04:43:15Z`；`tcp-handshake.md` 12:05:21+0800 → `04:05:21Z`）。证明时间随提交自动更新，无需额外脚本。
 
-- [ ] **T7.5 可迁移性核对（spec 6.3）**
+- [×] **T7.5 可迁移性核对（spec 6.3）**
   - 全站纯静态：无数据库、无后端接口、无运行时环境变量依赖。
   - 完成标准：`docs/.vitepress/dist/` 可直接被任意静态服务器托管并正常访问（含搜索）。
+  - 执行记录：扫描全部 24 个页面产物 —— 外部 CDN 脚本、外部样式表、外部字体（Google Fonts 等）、后端接口调用、数据库/WebSocket 依赖**全部为 0**；搜索索引为本地静态文件（`@localSearchIndexroot.*.js`，45.7 KB），无服务端参与；产物中 `process.env` 出现次数为 0（环境变量仅构建期使用）。
 
-- [ ] **T7.6 编写 README 项目说明（spec 9 / 8.5）**
+- [×] **T7.6 编写 README 项目说明（spec 9 / 8.5）**
   - 包含：项目简介与定位、目录结构说明、本地启动方式（安装/开发/构建/预览命令）、部署方式（GitHub Pages 步骤 + base 注意事项 + Vercel 备选）、文章书写规范入口（指向 T5.1 文档）。
   - 完成标准：README 三项（启动/部署/使用文档）齐备，命令逐条实测可执行。
+  - 执行记录：`README.md` 已建，含技术栈表、完整目录树、本地启动四步命令、GitHub Pages 首次启用步骤、base 路径三场景对照表、其他静态托管说明、写文章要点、6 条踩坑注意事项、更新日志。
+  - 实测验证：README 内 2 个相对链接（`docs/CONTRIBUTING.md`、`.github/workflows/deploy.yml`）与 9 个提及路径**全部存在**；三个 npm 命令与 `package.json` scripts 一致；`npm ci` 亲测可复现（249 packages，退出码 0）。
+  - 额外记录：验证 `npm ci` 时首次失败并暴露一个真实约束 —— **`docs:preview` 进程未关闭会占用 `dist` 与 `node_modules`，导致 `npm ci` 报权限错误**。已在 README 的启动说明中写明"构建后需重启预览进程"。
 
 ---
 
