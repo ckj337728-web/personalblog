@@ -131,8 +131,104 @@ export default withMermaid(
             }
           }
         }
+      },
+
+      // ----------------------------------------------------------------
+      // 内置界面文案中文化
+      // ----------------------------------------------------------------
+      // vitepress 1.6.4 没有 zh-CN 内置语言包（不随 lang 自动切换），
+      // 默认输出英文（"On this page" / "Previous page" / "Menu" 等）。
+      // 全站中文书写（spec 5），故逐项覆盖以下内置文案。
+      outline: {
+        label: '本页目录',
+        // 展示到三级标题，与 spec 5「标题层级严格」对应。
+        level: [2, 3]
+      },
+      docFooter: {
+        prev: '上一篇',
+        next: '下一篇'
+      },
+      sidebarMenuLabel: '目录',
+      returnToTopLabel: '回到顶部',
+      darkModeSwitchLabel: '外观',
+      lightModeSwitchTitle: '切换到亮色模式',
+      darkModeSwitchTitle: '切换到暗色模式',
+      // 键盘聚焦时才可见的"跳到正文"链接，默认英文 "Skip to content"。
+      skipToContentLabel: '跳到正文',
+      // 说明：导航栏屏幕阅读器标签 "Main Navigation" 为组件内硬编码，
+      // vitepress 1.6.4 未提供配置项，无法通过配置中文化，属上游限制（不影响可见文案）。
+
+      // ----------------------------------------------------------------
+      // T4.1 顶部导航栏（spec 3.1，顺序与文案固定）
+      // ----------------------------------------------------------------
+      nav: [
+        { text: '首页', link: '/' },
+        { text: '知识库', link: '/knowledge/' },
+        { text: '技术博客', link: '/blog/' },
+        { text: '项目实践', link: '/projects/' },
+        { text: '关于我', link: '/about' }
+      ],
+
+      // ----------------------------------------------------------------
+      // T4.2 / T4.3 知识库侧边栏 = spec 3.2 的 7 大分类骨架
+      // ----------------------------------------------------------------
+      // 顺序严格 01→07；01 与 05 下的子分类做二级嵌套。
+      // collapsed: false 让分组默认展开（spec 4.2 要求可折叠/展开，折叠交互由主题提供）。
+      // 条目 text 与磁盘目录名保持一致，便于对照维护。
+      sidebar: {
+        '/knowledge/': [
+          {
+            text: '知识库',
+            items: [
+              {
+                text: '01-计算机基础',
+                collapsed: false,
+                items: [
+                  { text: '计算机网络', link: '/knowledge/01-计算机基础/计算机网络/' },
+                  { text: 'TCP 三次握手与四次挥手', link: '/knowledge/01-计算机基础/计算机网络/tcp-handshake' },
+                  { text: '操作系统', link: '/knowledge/01-计算机基础/操作系统/' },
+                  { text: '数据结构与算法', link: '/knowledge/01-计算机基础/数据结构与算法/' }
+                ]
+              },
+              { text: '02-Linux运维与底层', link: '/knowledge/02-Linux运维与底层/' },
+              { text: '03-C与C++编程笔记', link: '/knowledge/03-C与C++编程笔记/' },
+              { text: '04-前端工程化', link: '/knowledge/04-前端工程化/' },
+              {
+                text: '05-AI与LLM学习',
+                collapsed: false,
+                items: [
+                  { text: '大模型基础', link: '/knowledge/05-AI与LLM学习/大模型基础/' },
+                  { text: 'Agent智能体', link: '/knowledge/05-AI与LLM学习/Agent智能体/' },
+                  { text: 'Harness与沙箱与评测体系', link: '/knowledge/05-AI与LLM学习/Harness与沙箱与评测体系/' },
+                  { text: 'Prompt工程', link: '/knowledge/05-AI与LLM学习/Prompt工程/' }
+                ]
+              },
+              { text: '06-开源项目研读', link: '/knowledge/06-开源项目研读/' },
+              { text: '07-工具教程与踩坑记录', link: '/knowledge/07-工具教程与踩坑记录/' }
+            ]
+          }
+        ],
+
+        // --------------------------------------------------------------
+        // T4.4 博客与项目实践侧边栏
+        // --------------------------------------------------------------
+        '/blog/': [
+          {
+            text: '技术博客',
+            items: [
+              { text: '文章列表', link: '/blog/' }
+              // 后续新增文章在此登记（按日期倒序）。
+            ]
+          }
+        ],
+        '/projects/': [
+          {
+            text: '项目实践',
+            items: [{ text: '项目列表', link: '/projects/' }]
+          }
+        ]
       }
-      // 导航栏、侧边栏在阶段四（T4.1–T4.4）配置。
+      // T4.6 首页文案在 docs/index.md 中实现（极简，不使用 hero/features 组件）。
     }
   })
 )
