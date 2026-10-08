@@ -1,4 +1,4 @@
-# debug-task.md —— 移动端问题修复任务清单
+﻿# debug-task.md —— 移动端问题修复任务清单
 
 > 依据：[debug.md](./debug.md)（移动端两个问题的排查记录）
 > 状态标记：`[ ]` 未完成 / `[×]` 已完成
@@ -147,32 +147,56 @@
 
 ## 阶段四：回归验收
 
-- [ ] **T-R1 默认 base 构建通过**
+- [×] **T-R1 默认 base 构建通过**
   - 执行：`npm run docs:build`。
   - 完成标准：退出码 0；构建输出中无 dead link 报错、无 `Build failed`。
+  - 执行记录（通过）：退出码 **0**（16.59s）；日志中 **dead link 报错 0 处、`Build failed` 0 处**；产物 25 个页面，`dist/blog/index.html` 存在。
 
-- [ ] **T-R2 功能断言全部通过**
+- [×] **T-R2 功能断言全部通过**
   - 执行：`docs:preview` 后运行 `.automation/verify-features.cjs`（默认 base）。
   - 完成标准：原有 22 项 + T-D9 新增断言**全部 PASS，失败数 0**；控制台错误 0、页面异常 0。
+  - 执行记录（通过）：**24 项全部 PASS、失败 0**，退出码 0；控制台错误 **0**、页面异常 **0**。逐项含新增的「博客列表链接带部署 base 前缀 (T-D9)」（2 条，前缀 `/`）与「博客列表每条链接点击可达 (T-D9)」（2 条全部可打开）。
+  - 说明：本项在阶段三收尾时已跑过 2 次（均 24/24），本阶段再次确认一次。
 
-- [ ] **T-R3 终检全部通过**
+- [×] **T-R3 终检全部通过**
   - 执行：运行 `.automation/verify-final.cjs`。
   - 完成标准：断链、内容规范、目录结构、交付物、禁用项各项**全部 PASS，失败数 0**。
+  - 执行记录（通过）：**10 项全部 PASS、失败 0**，退出码 0。要点：内部页面链接 26 个全部可解析、正文内联链接 21 个全部可解析、HTTP 层 26 个链接全部 200、3 篇示例文章规范全通过、目录结构与 spec 3.2 逐条一致、交付物六项齐备、无禁用框架与特效（扫描 25 个页面）。
 
-- [ ] **T-R4 双 base 场景通过**
+- [×] **T-R4 双 base 场景通过**
   - 执行：运行 `.automation/verify-base.ps1`。
   - 完成标准：`OVERALL: PASS`，两个场景的 `RESULT: PASS`，资源引用缺失数与前缀错误数均为 0。
+  - 执行记录（通过）：**`OVERALL: PASS`**，两场景均 `RESULT: PASS`（退出码 0）：
+    | 场景 | 资源引用 | 前缀错误 | 磁盘缺失 | 页面内链接 | 缺前缀链接 |
+    | --- | --- | --- | --- | --- | --- |
+    | `base = /` | 1156 | 0 | 0 | 75 | 0 |
+    | `base = /personalblog/` | 1156 | 0 | 0 | 75 | 0 |
 
-- [ ] **T-R5 线上回归通过**
+- [×] **T-R5 线上回归通过**
   - 执行：对 `https://ckj337728-web.github.io/personalblog` 运行 `.automation/verify-features.cjs`（移动端模拟）。
   - 完成标准：全部断言 PASS；`失败请求(>=400)` 为 **0**；点击博客文章列表不再出现 404。
+  - 执行记录（通过）：**24 项全部 PASS、失败 0**，退出码 0；控制台错误 **0**、页面异常 **0**、**失败请求(>=400) 0**；两条博客列表链接点击断言均 PASS（前缀 `/personalblog/`、2 条全部可打开）。
 
-- [ ] **T-R6 确认改动范围符合约束**
-  - 执行：对比改动前后的 `package.json` 与 `docs/.vitepress/theme/` 目录；并用 `git diff --stat` 检视本次全部改动。
+- [×] **T-R6 确认改动范围符合约束**
+  - 执行：对比改动前后的 `package.json` 与 `docs/.vitepress/theme/` 目录；并用 `git log --name-status` 检视本次全部改动。
   - 完成标准：
     - `package.json` 依赖项数量与内容**均无变化**；
     - `docs/.vitepress/theme/` 下**无新增文件**（仅修改既有文件）；
-    - `git diff` 中不出现与本次缺陷无关的文件改动。
+    - 改动中不出现与本次缺陷无关的文件。
+  - 执行记录（三项全部通过）：
+    1. **依赖零改动**：`dependencies` 仍为空、`devDependencies` 仍为 5 项（`vitepress`、`vitepress-plugin-mermaid`、`mermaid`、`@mdit/plugin-katex`、`katex`）；在 `7dc8bfe..HEAD` 区间内 `package.json` 与 `package-lock.json` **未被任何提交触及**。
+    2. **theme/ 无新增文件**：目录内容为 `blog.data.ts`、`BlogList.vue`、`custom.css`、`index.ts`、`Layout.vue`、`SiteFooter.vue`；本区间内 theme/ 下**仅有 `M docs/.vitepress/theme/BlogList.vue`**（修改），**无 `A`（新增）**。
+    3. **无无关改动**：本区间全部改动文件共 9 处，逐条归类后**全部与本次缺陷、验证或记录相关**：
+       | 文件 | 归类 |
+       | --- | --- |
+       | `docs/.vitepress/theme/BlogList.vue` | 缺陷根因修复（T-D5） |
+       | `docs/.vitepress/config.ts` | 删除副本的侧边栏条目（T-D2） |
+       | `docs/blog/my-first-post - 副本.md`（D） | 删除重复文件（T-D1） |
+       | `.automation/verify-features.cjs` | 补测试盲区 + 修 flaky（T-D9） |
+       | `.automation/verify-base.ps1` | 扩大校验范围（T-D10） |
+       | `task.md` | 进度同步（按用户要求） |
+       | `debug.md` / `debug-task.md` | 排查记录与任务清单 |
+       未触及知识库内容、项目页、README、依赖清单。
 
 ---
 
@@ -203,7 +227,7 @@
     | 点击一次开关后 | `""`（亮色） | `#ffffff` | 255 |
     | 再点一次 | `dark` | `#1b1b1f` | 27.3 |
     结论：功能正常，**方向与直觉相反**是主因。处理方式为在 `如何测试.md` 中补充「网站默认跟随系统主题」的说明，**不修改 `appearance` 默认值**（改默认值会违背站点既有外观策略，属无关改动）。
-  - **待办移交**：该说明的补充属阶段五范围内的文档改动，可在阶段二~四完成后一并处理。
+  - **移交事项已完成**：所需说明已补入 `如何测试.md` —— 新增「手机端怎么切换明暗」小节，写明①手机端切换入口在汉堡菜单最底部的「外观」；②网站默认跟随系统主题，故深色手机打开时本就是暗色、点一下会变亮（方向相反属预期行为）；③如何判断功能是否正常（看整页底色是否改变）。同时修正了手册第 8 项原写"点右上角太阳/月亮图标"的表述 —— 该按钮**手机端不存在**，原描述会误导。
 
 ---
 
