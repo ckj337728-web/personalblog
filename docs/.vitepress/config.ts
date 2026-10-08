@@ -262,7 +262,8 @@ export default withMermaid(
             text: '技术博客',
             items: [
               { text: '文章列表', link: '/blog/' },
-              { text: 'LaTeX 公式被静默丢弃', link: '/blog/vitepress-math-silent-failure' }
+              { text: 'LaTeX 公式被静默丢弃', link: '/blog/vitepress-math-silent-failure' },
+              { text: '我的第一篇测试文章', link: '/blog/my-first-post' }
               // 后续新增文章在此登记（按日期倒序）。
             ]
           }
