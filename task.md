@@ -604,7 +604,9 @@
     6. `base` 自动推导验证：仓库名为 `personalblog`（非目录名 `ckj_blog`），工作流按仓库名推导出 `/personalblog/`，线上 48 个资源引用全部 200，且无裸 `/assets/` 引用。
   - **过程中发现并修复的真实缺陷（favicon 子路径 404）**：线上浏览器请求 `https://ckj337728-web.github.io/favicon.svg` 返回 404。根因是 `config.ts` 的 `head` 中手写绝对路径 `/favicon.svg`，而 **VitePress 不会为 head 里手写的绝对路径补 base 前缀**（官方文档中"base 会自动加到以 / 开头的 URL"的描述仅适用于 `base: './'` 的可搬迁构建）。修复为 `transformHead` 中按 base 动态拼接；定位过程中还确认了正确的上下文字段是 `ctx.siteData.base`，`ctx.siteConfig` 中并无 `base`（曾因此产出 `undefinedfavicon.svg`）。修复后两种 base 场景均正确且标签位于 `<head>` 内。
   - 同步修正：`.automation/verify-base.ps1` 原先硬编码 `/ckj_blog/`，已改为从 `git remote` 自动推导仓库名，避免仓库改名后脚本失效。
-  - **未解问题（如实记录，未标记为已验证）**：`push` 到 `main` **不会触发** workflow 运行。实测证据：①首次推送与后续两次推送（含一次空提交）均未产生 `event=push` 的运行，`total_count` 始终只有手动派发的那一次；②已通过 API 逐一排除常见原因 —— `actions/permissions` 为 `enabled: true, allowed_actions: all`、workflow `state=active` 且 `path` 正确、远端 `deploy.yml` 的 `on.push.branches=[main]` 解析正常、无分支保护规则（404）、推送确认落地（远端 HEAD 与本地一致）。③推送所用凭据为 GitHub 官方凭据管理器（`x-oauth-client-id: 0120e057bd645470c1ed`，标准 OAuth app，`repo`+`workflow` scope），理论上属不应被抑制的类型。**根因未确认，需在仓库页面排查**（Settings → Actions → General，以及 Actions 页签是否有提示横幅）。当前部署依赖 `workflow_dispatch`：既可在 Actions 页签点 "Run workflow"，也可由 API 派发；本次两次成功部署（`37643406741`、`37645958368`）均由此触发。
+  - **push 不触发问题的最终结论（已解决）**：问题存在期间，`push` 到 `main` 不产生 workflow 运行，先后 4 次推送（含一次空提交）均如此，而 `workflow_dispatch` 始终正常。已通过 API 逐一排除常见原因 —— `actions/permissions` 为 `enabled: true, allowed_actions: all`、workflow `state=active` 且 path 正确、远端 `on.push.branches=[main]` 解析正常、无分支保护规则（404）、推送确认落地（远端 HEAD 与本地一致）、凭据为 GitHub 官方凭据管理器（标准 OAuth app，`repo`+`workflow` scope）。
+  - **解决与验证**：在仓库 owner 确认 Actions 页面已无警示横幅后做真实推送复测 —— **连续两次推送均自动触发**：运行 `37732460191` @ `4a1c9b3`、`37732551264` @ `d60edd9`，均为 `event=push`、`conclusion=success`，build 与 deploy 两个 job 全部成功。结论：触发异常与"仓库 Pages 尚未配置完成"这一状态相关，Pages 启用并成功部署后自行恢复。**spec 6.2「Push 代码自动打包、自动部署」现已实测生效，不再依赖手动派发。**
+  - 文档同步：《如何测试》手册中原先"需手动点 Run workflow"的兜底说明已移除，改为"推送后自动更新"，避免使用者继续做无用操作。
   - 另一处修正：验收脚本的侧边栏断言存在 flaky —— `networkidle` 可能早于客户端 hydration 完成，导致远端环境下找不到 `.caret`。已改为显式 `waitForSelector`，线上连跑 3 次均 22/22 通过且零控制台错误。
 
 ---
