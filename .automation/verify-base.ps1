@@ -65,7 +65,47 @@ function Invoke-BuildCheck {
   Write-Host "  asset refs checked : $refTotal"
   Write-Host "  wrong base prefix  : $refBadPrefix"
   Write-Host "  missing on disk    : $refMissing"
-  $pass = ($refBadPrefix -eq 0) -and ($refMissing -eq 0) -and ($refTotal -gt 0)
+
+  # ------------------------------------------------------------------
+  # T-D10: also validate IN-PAGE links (e.g. /blog/xxx.html) under sub-path base.
+  #
+  # Why: the check above only looks at /assets/ and /images/. The 404 defect was in an
+  # in-page link (a raw <a href> inside a Vue component), which that pattern never saw.
+  #
+  # Avoiding false positives: not every root-absolute href is a routed page (site root
+  # '/', '/vp-icons.css', external or anchor links). So a link is only *judged* when the
+  # same path WITHOUT the expected prefix exists on disk -- if it does, the missing
+  # prefix is a real defect; otherwise the link is simply not our concern.
+  # ------------------------------------------------------------------
+  $linkTotal = 0
+  $linkBadPrefix = 0
+  $linkNegPrefix = 0
+
+  $linkPattern = '(?:href|src)="(/[^"#?]*\.(?:html|htm))"'
+  foreach ($page in $html) {
+    $content = Get-Content $page.FullName -Raw -Encoding UTF8
+    foreach ($m in [regex]::Matches($content, $linkPattern)) {
+      $ref = $m.Groups[1].Value
+
+      if ($ref.StartsWith($Prefix)) {
+        $linkTotal++
+        continue
+      }
+
+      # Candidate defect: this link lacks the prefix. Confirm by checking whether the
+      # unprefixed path really is a built page.
+      $candidate = Join-Path $dist ($ref.TrimStart('/') -replace '/', '\')
+      if (Test-Path $candidate) {
+        $linkNegPrefix++
+        Write-Host "    page link missing prefix: $ref"
+      }
+      # else: not a built page (site root, external-looking path, etc.) -> ignore
+    }
+  }
+
+  Write-Host "  page links with prefix : $linkTotal"
+  Write-Host "  page links missing prefix (confirmed): $linkNegPrefix"
+  $pass = ($refBadPrefix -eq 0) -and ($refMissing -eq 0) -and ($refTotal -gt 0) -and ($linkNegPrefix -eq 0)
   Write-Host "  RESULT: $(if ($pass) { 'PASS' } else { 'FAIL' })"
   Write-Host ""
   return $pass

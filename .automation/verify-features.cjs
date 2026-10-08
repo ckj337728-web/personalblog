@@ -198,6 +198,42 @@ function check(name, pass, detail = '') {
   await page.goto(join(BLOG_ARTICLE), { waitUntil: 'networkidle' })
   check('博客示例文章可打开', (await page.title()).length > 0)
 
+  // ---------- blog list links (added for T-D9) ----------
+  // Why this exists: BlogList.vue rendered raw <a :href="post.url">, and VitePress only
+  // appends the deploy base to Markdown links and link components -- not to raw anchors
+  // inside components. Under a sub-path base every article link therefore 404'd, while
+  // HTTP-level checks and the HTML-only checks above still passed. This asserts both the
+  // href prefix AND a real click, so the regression cannot recur silently.
+  await page.goto(join('blog/'), { waitUntil: 'networkidle' })
+  await page.waitForSelector('.blog-list a', { timeout: 30000 })
+  const blogHrefs = await page.$$eval('.blog-list a', (els) => els.map((e) => e.getAttribute('href')))
+  const wantPrefix = (BASE_PATH.endsWith('/') ? BASE_PATH : BASE_PATH + '/')
+  const badPrefix = blogHrefs.filter((h) => !h || !h.startsWith(wantPrefix))
+  check(
+    '博客列表链接带部署 base 前缀 (T-D9)',
+    blogHrefs.length > 0 && badPrefix.length === 0,
+    `${blogHrefs.length} 条，前缀应为 "${wantPrefix}"${badPrefix.length ? '，异常: ' + badPrefix.join(', ') : ''}`
+  )
+
+  let blogClickFails = []
+  for (let i = 0; i < blogHrefs.length; i++) {
+    await page.goto(join('blog/'), { waitUntil: 'networkidle' })
+    await page.waitForSelector('.blog-list a', { timeout: 30000 })
+    await page.locator('.blog-list a').nth(i).click()
+    await page.waitForTimeout(1800)
+    const url = page.url()
+    const title = await page.title()
+    // A 404 shows up either in the page title or as a stray navigation away from the base
+    if (/404|Not Found/i.test(title) || !url.startsWith(BASE_URL + wantPrefix)) {
+      blogClickFails.push(`[${i}] ${blogHrefs[i]} -> ${url} (${title})`)
+    }
+  }
+  check(
+    '博客列表每条链接点击可达 (T-D9)',
+    blogClickFails.length === 0,
+    blogClickFails.length ? blogClickFails.join(' | ') : `${blogHrefs.length} 条全部可打开`
+  )
+
   // ---------- search ----------
   await page.goto(join(''), { waitUntil: 'networkidle' })
   await page.locator('button.DocSearch-Button, .VPNavBarSearch button, [aria-label="搜索"]').first().click()
